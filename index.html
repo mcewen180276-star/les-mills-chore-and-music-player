@@ -709,9 +709,10 @@ chViewTrack=function(t){v5ChViewTrack(t);if(pdfUrl)chTrackPages(t)};
 let chPdfDocument=null,chRenderToken=0,chCanvasMode=false,chDocumentLoadToken=0;
 async function chLoadDocument(){
  const loadToken=++chDocumentLoadToken;
+ ++chRenderToken; // Invalidate pending renders from the previous PDF
  chPdfDocument=null;chCanvasMode=false;
  if(!pdfFile)return;
- if(!window.pdfjsLib){$('chPdfInfo').textContent='Browser PDF fallback active. For reliable page viewing, use the hosted app with internet access.';return}
+ if(!window.pdfjsLib){$('chPdfInfo').textContent='Native PDF fallback: page links may not work in this browser. Open the hosted app online for the reliable PDF viewer.';return}
  try{
   const data=await pdfFile.arrayBuffer();
   const loadedDocument=await pdfjsLib.getDocument({data:new Uint8Array(data)}).promise;
@@ -728,9 +729,13 @@ async function chRenderCanvas(page){
   const p=await chPdfDocument.getPage(Math.max(1,Math.min(page,chPdfDocument.numPages)));
   if(token!==chRenderToken)return;
   const view=p.getViewport({scale:Math.min(4,Math.max(.4,pdfZoom/100))*1.35,rotation:chRotation});
-  const canvas=$('chCanvas'),ctx=canvas.getContext('2d');
-  canvas.width=Math.ceil(view.width);canvas.height=Math.ceil(view.height);
-  await p.render({canvasContext:ctx,viewport:view}).promise;
+  // Render to a private canvas so an older asynchronous page cannot overwrite the current one.
+  const buffer=document.createElement('canvas');
+  buffer.width=Math.ceil(view.width);buffer.height=Math.ceil(view.height);
+  await p.render({canvasContext:buffer.getContext('2d'),viewport:view}).promise;
+  if(token!==chRenderToken)return;
+  const canvas=$('chCanvas');canvas.width=buffer.width;canvas.height=buffer.height;
+  canvas.getContext('2d').drawImage(buffer,0,0);
   $('chPdfInfo').textContent=`${$('chProgramme').value} · Release ${$('chRelease').value||'?'} · Page ${pdfPage} / ${chPdfDocument.numPages} · ${pdfZoom}%`;
  }catch(e){$('chPdfInfo').textContent='Unable to render page. Try Open PDF.'}
 }
@@ -743,7 +748,7 @@ chNavigate=function(page){
  else chOldNavigate(pdfPage);
 };
 const chOldSetFile=chSetFile;
-chSetFile=function(f){chOldSetFile(f);$('chCanvas').style.display='none';$('chViewer').style.display='block';chLoadDocument()};
+chSetFile=function(f){++chRenderToken;chPdfDocument=null;chCanvasMode=false;chOldSetFile(f);$('chCanvas').style.display='none';$('chViewer').style.display='block';chLoadDocument()};
 function chSelectedPlaylist(){
  let p=extra.chPlaylists.find(x=>x.id===$('chPlaylistSelect').value);
  if(!p){const name=prompt('Name your new teaching playlist');if(!name?.trim())return null;p={id:'playlist'+Date.now(),name:name.trim(),items:[]};extra.chPlaylists.push(p);extraSave();chRenderPlaylists();$('chPlaylistSelect').value=p.id;chRenderPlaylists()}
