@@ -1162,7 +1162,9 @@ function chMusicLibraryItems(){
  return [...chMusicState.files.entries()].filter(([id,x])=>(!a||x.info.album===a)&&(!q||[x.info.name,x.info.title,x.info.artist,x.info.album,x.info.path].join(' ').toLowerCase().includes(q))).sort((a,b)=>a[1].info.album.localeCompare(b[1].info.album)||a[1].info.title.localeCompare(b[1].info.title));
 }
 function chMusicRenderLibrary(){
- const albums=[...new Set([...chMusicState.files.values()].map(x=>x.info.album))].sort(),old=$('chMusicAlbum').value;
+ const programme=$('chMusicProgramme').value||$('chWorkoutType').value;
+ const scoped=[...chMusicState.files.entries()].filter(([id,x])=>!programme||(typeof chMusicMatchesProgramme==='function'&&chMusicMatchesProgramme(x,programme)));
+ const albums=[...new Set(scoped.map(([,x])=>x.info.album))].sort(),old=$('chMusicAlbum').value;
  $('chMusicAlbum').innerHTML='<option value="">All folders and albums</option>'+albums.map(x=>`<option value="${safe(x)}">${safe(x)}</option>`).join('');
  $('chMusicAlbum').value=albums.includes(old)?old:'';
  $('chMusicLibrary').innerHTML=chMusicVisibleGroups().map((g,i)=>`<div class="item ch-track-row ${g.ids.includes(chMusicState.selected)?'ch-track-active':''}"><div class="ch-track-info"><b>${safe(g.label)}</b><small>${safe(g.info.artist||g.info.album)} · ${safe(g.info.album)}${g.parted?' · A+B combined':''}</small></div><div class="ch-song-actions"><button type="button" class="primary" data-mplaygroup="${i}">▶ Play</button><button type="button" data-maddgroup="${i}">＋ Playlist</button></div></div>`).join('')||'<p class="muted">No songs loaded yet. Tap Add music files or Choose a whole music folder above. If you previously imported songs, wait for the saved library to load.</p>';
@@ -1671,7 +1673,7 @@ $('chPageSongUnlink').onclick=()=>{
  const programmes=[...$('chProgramme').options].map(o=>o.value);
  workout.innerHTML='<option value="">All workout types</option>'+programmes.map(p=>`<option value="${safe(p)}">${safe(p)}</option>`).join('');
  const aliases={BODYPUMP:['bodypump','body pump','pump'],BODYCOMBAT:['bodycombat','body combat','combat'],BODYBALANCE:['bodybalance','body balance','balance','bodyflow'],BODYATTACK:['bodyattack','body attack','attack'],BODYSTEP:['bodystep','body step'],BODYJAM:['bodyjam','body jam'],RPM:['rpm'], 'LES MILLS SPRINT':['sprint'], 'THE TRIP':['the trip'], 'LES MILLS GRIT':['grit'], 'LES MILLS CORE':['lm core','les mills core','cxworx'], 'LES MILLS TONE':['tone'], 'LES MILLS DANCE':['les mills dance'], 'LES MILLS STRENGTH DEVELOPMENT':['strength development'], 'LES MILLS FUNCTIONAL STRENGTH':['functional strength']};
- function matchesMusic(item,programme){
+ window.chMusicMatchesProgramme=function(item,programme){
   if(!programme)return true;
   const path=[item?.info?.path,item?.info?.album,item?.info?.name,item?.info?.title].filter(Boolean).join(' ').toLowerCase().replace(/[_-]/g,' ');
   const names=aliases[programme]||[programme.toLowerCase()];
@@ -1679,7 +1681,7 @@ $('chPageSongUnlink').onclick=()=>{
  }
  // Music names/folders must include the programme for reliable filtering.
  const originalItems=chMusicLibraryItems;
- chMusicLibraryItems=function(){const items=originalItems();const chosen=$('chMusicProgramme').value||workout.value;if(!chosen)return items;return items.filter(([,item])=>matchesMusic(item,chosen))};
+ chMusicLibraryItems=function(){const items=originalItems();const chosen=$('chMusicProgramme').value||workout.value;if(!chosen)return items;return items.filter(([,item])=>chMusicMatchesProgramme(item,chosen))};
  function refresh(){
   const p=workout.value;
   $('chViewProgramme').value=p;
