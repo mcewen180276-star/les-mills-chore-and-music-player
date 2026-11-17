@@ -706,17 +706,20 @@ $('chNextTrackPage').onclick=()=>{if(!chActivePages.length)return toast('Select 
 const v5ChViewTrack=chViewTrack;
 chViewTrack=function(t){v5ChViewTrack(t);if(pdfUrl)chTrackPages(t)};
 
-let chPdfDocument=null,chRenderToken=0,chCanvasMode=false;
+let chPdfDocument=null,chRenderToken=0,chCanvasMode=false,chDocumentLoadToken=0;
 async function chLoadDocument(){
+ const loadToken=++chDocumentLoadToken;
  chPdfDocument=null;chCanvasMode=false;
  if(!pdfFile)return;
  if(!window.pdfjsLib){$('chPdfInfo').textContent='Browser PDF fallback active. For reliable page viewing, use the hosted app with internet access.';return}
  try{
   const data=await pdfFile.arrayBuffer();
-  chPdfDocument=await pdfjsLib.getDocument({data:new Uint8Array(data)}).promise;
+  const loadedDocument=await pdfjsLib.getDocument({data:new Uint8Array(data)}).promise;
+  if(loadToken!==chDocumentLoadToken)return;
+  chPdfDocument=loadedDocument;
   chCanvasMode=true;$('chCanvas').style.display='block';$('chViewer').style.display='none';
-  chNavigate(1);
- }catch(e){chCanvasMode=false;$('chCanvas').style.display='none';$('chViewer').style.display='block';toast('PDF renderer unavailable; using browser viewer')}
+  chNavigate(pdfPage); // Preserve the requested linked page while the PDF loads asynchronously.
+ }catch(e){if(loadToken!==chDocumentLoadToken)return;chCanvasMode=false;$('chCanvas').style.display='none';$('chViewer').style.display='block';toast('PDF renderer unavailable; using browser viewer')}
 }
 async function chRenderCanvas(page){
  if(!chPdfDocument)return;
