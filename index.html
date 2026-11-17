@@ -2516,8 +2516,8 @@ function init(){
  const canvas=$('chCanvas');
  if(canvas){
   let drag=null;
-  canvas.addEventListener('pointerdown',e=>{if(document.fullscreenElement!==stage||e.pointerType==='touch')return;drag={x:e.clientX,y:e.clientY,left:stage.scrollLeft,top:stage.scrollTop};canvas.setPointerCapture(e.pointerId)});
-  canvas.addEventListener('pointermove',e=>{if(!drag)return;stage.scrollLeft=drag.left+drag.x-e.clientX;stage.scrollTop=drag.top+drag.y-e.clientY});
+  canvas.addEventListener('pointerdown',e=>{if(document.fullscreenElement!==stage||e.pointerType==='touch')return;drag={x:e.clientX,y:e.clientY,left:(document.getElementById('chLockedPdfViewport')||stage).scrollLeft,top:(document.getElementById('chLockedPdfViewport')||stage).scrollTop};canvas.setPointerCapture(e.pointerId)});
+  canvas.addEventListener('pointermove',e=>{if(!drag)return;(document.getElementById('chLockedPdfViewport')||stage).scrollLeft=drag.left+drag.x-e.clientX;(document.getElementById('chLockedPdfViewport')||stage).scrollTop=drag.top+drag.y-e.clientY});
   ['pointerup','pointercancel','lostpointercapture'].forEach(t=>canvas.addEventListener(t,()=>{drag=null}));
  }
  // Add entire release PDF using existing import/storage path. Preserve the selected original file.
@@ -2543,4 +2543,49 @@ function init(){
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
 </script>
-</body></html>
+<style id="chStandaloneLocked">
+body.ch-standalone>header,body.ch-standalone>#nav{display:none!important}
+body.ch-standalone main.shell{max-width:none!important;width:100%!important;margin:0!important;padding:10px!important}
+body.ch-standalone main.shell>section:not(#choreo){display:none!important}
+body.ch-standalone #choreo{display:block!important}
+#chStandaloneHeader{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 9px;padding:8px 12px;border-radius:10px;background:#17283d;color:white}
+#chStandaloneHeader strong{font-size:1.05rem}
+#chPdfStage:fullscreen{overflow:hidden!important;overscroll-behavior:contain!important}
+#chPdfStage:fullscreen #chFullMusic{grid-column:1!important;grid-row:1!important;position:relative!important;transform:none!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain!important;height:100%!important;min-height:0!important}
+#chPdfStage:fullscreen #chLockedPdfViewport{grid-column:2!important;grid-row:1!important;position:relative!important;width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;overflow:auto!important;overscroll-behavior:contain!important;touch-action:pan-x pan-y!important;background:#e7ebf1!important;text-align:center!important}
+#chPdfStage:fullscreen #chLockedPdfViewport #chCanvas{display:block;position:relative!important;grid-column:auto!important;grid-row:auto!important;max-width:none!important;max-height:none!important;width:auto!important;height:auto!important;margin:8px auto!important}
+#chPdfStage:fullscreen #chLockedPdfViewport #chCanvas[style*="display: none"]{display:none!important}
+#chPdfStage:fullscreen #chLockedPdfViewport #chViewer{grid-column:auto!important;grid-row:auto!important;width:100%!important;height:100%!important}
+</style>
+<script id="chStandaloneLockedScript">
+(function(){
+function init(){
+ const stage=document.getElementById('chPdfStage'),ch=document.getElementById('choreo');
+ if(!stage||!ch)return;
+ document.body.classList.add('ch-standalone');
+ document.title='Choreography & Music Studio';
+ const title=document.createElement('div');title.id='chStandaloneHeader';
+ title.innerHTML='<strong>♫ Choreography &amp; Music Studio</strong><span>Standalone teaching edition</span>';
+ ch.insertBefore(title,ch.firstChild);
+ const tab=document.querySelector('#nav [data-tab="choreo"]');
+ if(tab)tab.click();
+ // Keep music player in its own fixed grid column. Only the PDF viewport scrolls.
+ const canvas=document.getElementById('chCanvas'),iframe=document.getElementById('chViewer');
+ const viewport=document.createElement('div');viewport.id='chLockedPdfViewport';
+ let active=false;
+ document.addEventListener('fullscreenchange',()=>{
+  if(document.fullscreenElement===stage&&!active){
+   active=true;
+   stage.insertBefore(viewport,stage.firstChild);
+   viewport.appendChild(canvas);viewport.appendChild(iframe);
+  }else if(document.fullscreenElement!==stage&&active){
+   active=false;
+   stage.insertBefore(canvas,viewport);
+   stage.insertBefore(iframe,viewport);
+   viewport.remove();
+  }
+ });
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script></body></html>
