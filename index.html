@@ -885,8 +885,11 @@ function chFitToWidth(){
  if(!chPdfDocument)return toast('PDF viewer is still loading');
  chPdfDocument.getPage(pdfPage).then(p=>{
   const unscaled=p.getViewport({scale:1,rotation:chRotation});
-  const width=Math.max(250,$('chPdfStage').clientWidth-25);
-  pdfZoom=Math.max(40,Math.min(400,Math.round(width/unscaled.width/1.35*100)));
+  const stage=$('chPdfStage'),full=document.fullscreenElement===stage;
+  const availableWidth=stage.clientWidth-(full?Math.max(175,stage.clientWidth*.28):0)-30;
+  const availableHeight=stage.clientHeight-25;
+  const width=Math.max(120,Math.min(availableWidth,availableHeight*unscaled.width/unscaled.height));
+  pdfZoom=Math.max(20,Math.min(400,Math.round(width/unscaled.width/1.35*100)));
   chNavigate(pdfPage);
  });
 }
@@ -2447,6 +2450,95 @@ function init(){
  if(picker){picker.hidden=false;picker.style.display=''}
  const manage=get('chViewerMusicManage');
  if(manage)manage.onclick=()=>{if(music){music.open=true;music.scrollIntoView({behavior:'smooth',block:'nearest'})}};
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script>
+
+<style id="chFullTeachingV156">
+#chPdfStage:fullscreen #chFullMusic{min-width:0!important}
+#chPdfStage:fullscreen #chCanvas{object-fit:unset!important;max-width:none!important;max-height:none!important}
+#chPdfStage:fullscreen #chViewer{overflow:auto!important}
+#chPdfStage:fullscreen{overflow:auto!important;touch-action:pan-x pan-y!important}
+#chPdfStage:fullscreen .ch-full-zoom{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+#chPdfStage:fullscreen .ch-full-zoom button{flex:1 1 55px;padding:8px 5px}
+#chPdfStage:fullscreen .ch-full-queue{display:block;flex:1 1 auto;overflow-y:auto;min-height:80px;max-height:48vh;margin-top:8px}
+#chPdfStage:fullscreen .ch-full-queue button{display:block;width:100%;padding:8px 6px;margin:3px 0;text-align:left;font-size:.8rem;white-space:normal;overflow-wrap:anywhere}
+#chPdfStage:fullscreen .ch-full-queue button[aria-current="true"]{font-weight:800;outline:2px solid #91baff}
+#chPdfStage:fullscreen .ch-full-queue h4{font-size:.9rem;margin:4px 0 7px}
+#chPdfStage:fullscreen #chFullMusic .ch-full-zoom,#chPdfStage:fullscreen #chFullMusic .ch-full-queue{color:white}
+#chFullMusic .ch-full-zoom,#chFullMusic .ch-full-queue{display:none}
+#chPdfStage:fullscreen #chFullMusic{overflow-y:auto!important}
+#chPdfStage:fullscreen #chCanvas{cursor:grab}
+#chPdfStage:fullscreen #chCanvas:active{cursor:grabbing}
+#chReleasePdfAttach{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin:8px 0;padding:10px;border:1px solid #cbd7e8;border-radius:9px}
+#chReleasePdfAttach>div{flex:1 1 140px}
+#chReleasePdfAttach button{padding:9px}
+</style>
+<script id="chFullTeachingV156Logic">
+(function(){
+function init(){
+ const $=id=>document.getElementById(id),stage=$('chPdfStage'),full=$('chFullMusic');
+ if(!stage||!full)return;
+ const zoom=document.createElement('div');zoom.className='ch-full-zoom';
+ zoom.innerHTML='<button type="button" id="chFullZoomOut">− Zoom</button><button type="button" id="chFullFit">Fit page</button><button type="button" id="chFullZoomIn">＋ Zoom</button>';
+ full.appendChild(zoom);
+ for(const [id,existing] of [['chFullZoomOut','chZoomOut'],['chFullZoomIn','chZoomIn']]){
+  $(id).addEventListener('click',e=>{e.stopPropagation();$(existing).click()});
+ }
+ // Fit is a one-off action; it does not lock the user into fit mode.
+ $('chFullFit').addEventListener('click',e=>{e.stopPropagation();$('chFitWidth').click()});
+ const list=document.createElement('div');list.className='ch-full-queue';list.innerHTML='<h4>Playing folder / playlist</h4><div id="chFullQueueItems"></div>';
+ full.appendChild(list);
+ let last='';
+ function renderQueue(){
+  if(document.fullscreenElement!==stage)return;
+  try{
+   const queue=chMusicActiveQueue(),name=chMusicState.queueTitle||chMusicPlaylist()?.name||'Current music';
+   const signature=name+'|'+queue.join('|')+'|'+chMusicState.playing;
+   if(signature===last)return;last=signature;
+   list.querySelector('h4').textContent=name;
+   $('chFullQueueItems').replaceChildren();
+   queue.forEach((id,i)=>{
+    const btn=document.createElement('button');btn.type='button';
+    btn.textContent=(i+1)+'. '+chMusicDisplayTitle(id);
+    btn.setAttribute('aria-current',String(i===chMusicState.playing));
+    btn.addEventListener('click',e=>{e.stopPropagation();chMusicPlayQueueAt(i,true);last='';renderQueue()});
+    $('chFullQueueItems').appendChild(btn);
+   });
+  }catch(e){list.querySelector('h4').textContent='Track list unavailable'}
+ }
+ // Existing song change and queue selection render through their normal event handlers.
+ document.addEventListener('fullscreenchange',()=>{last='';renderQueue()});
+ ['chMusicNext','chMusicPrev','chFullNext','chFullPrev','chFullPlay'].forEach(id=>{const el=$(id);if(el)el.addEventListener('click',()=>{last='';renderQueue()})});
+ const audio=$('chAudio');if(audio)audio.addEventListener('play',()=>{last='';renderQueue()});
+ // Allow dragging the PDF canvas to pan after zooming; do not interfere with touch pinch/drag.
+ const canvas=$('chCanvas');
+ if(canvas){
+  let drag=null;
+  canvas.addEventListener('pointerdown',e=>{if(document.fullscreenElement!==stage||e.pointerType==='touch')return;drag={x:e.clientX,y:e.clientY,left:stage.scrollLeft,top:stage.scrollTop};canvas.setPointerCapture(e.pointerId)});
+  canvas.addEventListener('pointermove',e=>{if(!drag)return;stage.scrollLeft=drag.left+drag.x-e.clientX;stage.scrollTop=drag.top+drag.y-e.clientY});
+  ['pointerup','pointercancel','lostpointercapture'].forEach(t=>canvas.addEventListener(t,()=>{drag=null}));
+ }
+ // Add entire release PDF using existing import/storage path. Preserve the selected original file.
+ const anchor=$('chPdf');
+ if(anchor){
+  const box=document.createElement('div');box.id='chReleasePdfAttach';
+  box.innerHTML='<div><label for="chReleasePdfWhole">Attach complete PDF to selected music release</label><input id="chReleasePdfWhole" type="file" accept=".pdf,application/pdf"></div><button id="chReleasePdfSave" type="button">Attach PDF</button>';
+  anchor.parentElement.appendChild(box);
+  $('chReleasePdfSave').addEventListener('click',async()=>{
+   const file=$('chReleasePdfWhole').files?.[0],programme=$('chProgramme').value,release=$('chRelease').value.trim();
+   if(!file)return alert('Choose a PDF first.');
+   if(!release)return alert('Select or enter a release number first.');
+   const renamed=new File([file],programme+' '+release+'.pdf',{type:'application/pdf',lastModified:file.lastModified});
+   try{
+    chMergeFiles([renamed]);await chStoreFiles([renamed]);chFolderResults();
+    const idx=chFolderPdfs.indexOf(renamed);
+    if(idx>=0)chOpenFolderIndex(idx);
+    alert('PDF attached to '+programme+' '+release+'. The entire PDF is available for this release.');
+   }catch(e){alert('Could not attach PDF: '+e.message)}
+  });
+ }
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
