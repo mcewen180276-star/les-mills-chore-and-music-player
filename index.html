@@ -2588,4 +2588,80 @@ function init(){
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
-</script></body></html>
+</script>
+<style id="studioCleanV3">
+body.ch-standalone main.shell{padding:8px 12px!important;max-width:100%!important}
+body.ch-standalone #choreo{width:100%;max-width:100%;margin:0!important;padding:0!important}
+body.ch-standalone #choreo>h2,body.ch-standalone #choreo>.muted,body.ch-standalone #choreo>.section-intro{display:none!important}
+#chStandaloneHeader{margin-bottom:8px!important;padding:9px 14px!important}
+#cleanToolbar{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;overflow:visible;padding:7px;background:#15243b;border-radius:12px;margin-bottom:10px;position:relative;z-index:40}
+#cleanToolbar .clean-menu{position:relative;flex:0 0 auto;min-width:0}
+#cleanToolbar .clean-menu>summary{display:block;cursor:pointer;list-style:none;white-space:nowrap;color:white;font-weight:700;font-size:13px;padding:10px 12px;border-radius:8px;background:#29405c}
+#cleanToolbar .clean-menu>summary::-webkit-details-marker{display:none}
+#cleanToolbar .clean-menu>summary:after{content:' ▾';opacity:.8}
+#cleanToolbar .clean-menu[open]>summary{background:#3276c5}
+#cleanToolbar .clean-menu .clean-pop{position:absolute;top:calc(100% + 6px);left:0;width:min(430px,calc(100vw - 24px));max-height:min(70vh,650px);overflow:auto;overscroll-behavior:contain;background:#fff;color:#17263a;padding:12px;border:1px solid #b7c8da;border-radius:12px;box-shadow:0 12px 30px #0004;z-index:100;box-sizing:border-box}
+#cleanToolbar .clean-menu:last-child .clean-pop,#cleanToolbar .clean-menu:nth-last-child(2) .clean-pop{left:auto;right:0}
+#cleanToolbar .clean-pop .row{display:flex;flex-wrap:wrap;gap:6px}
+#cleanToolbar .clean-pop input,#cleanToolbar .clean-pop select{max-width:100%}
+#cleanToolbar .clean-pop .studio-panel{display:block!important;border:0!important;padding:0!important}
+#cleanToolbar .clean-pop .studio-panel>summary{display:none!important}
+#cleanToolbar .clean-pop .ch-workout-picker{width:100%}
+#cleanToolbar .clean-pop button{white-space:normal}
+#cleanLayout{display:grid;grid-template-columns:minmax(275px,32%) minmax(0,1fr);gap:12px;align-items:start;min-width:0}
+#cleanMusic,#cleanPdf{min-width:0;display:flex;flex-direction:column;gap:10px}
+#cleanMusic>*,#cleanPdf>*{min-width:0;max-width:100%;box-sizing:border-box;margin:0!important}
+#cleanMusic #chMusicPlayer{order:0;position:relative!important;top:auto!important}
+#cleanMusic .ch-music-accordion{order:2}
+#cleanMusic #chMusicPanel{order:3}
+#cleanMusic #chPlaylistPanel{order:4}
+#cleanMusic details,#cleanPdf details{border:1px solid #d2dfed;border-radius:10px;padding:8px;background:var(--card,#fff)}
+#cleanMusic details>summary,#cleanPdf details>summary{font-weight:700;cursor:pointer;padding:5px}
+#cleanPdf .studio-viewer{width:100%!important;min-width:0}
+#cleanPdf #chPdfStage{width:100%!important;min-width:0}
+#cleanPdf #chCanvas{max-width:100%}
+#cleanMusic .ch-music-player{padding:12px!important}
+#cleanPdf .ch-advanced{order:3}
+#cleanToolbar .clean-menu .clean-pop .ch-top-actions{display:flex!important;flex-wrap:wrap!important}
+@media(max-width:760px){#cleanToolbar{overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}#cleanToolbar:has(details[open]){overflow:visible;flex-wrap:wrap}#cleanLayout{grid-template-columns:minmax(0,1fr)}#cleanToolbar .clean-menu>summary{font-size:12px;padding:9px}#cleanToolbar .clean-menu .clean-pop{position:fixed;top:85px;left:10px!important;right:10px!important;width:auto;max-height:75vh}}
+</style>
+<script id="studioCleanV3Logic">
+(function(){
+function init(){
+const ch=document.getElementById('choreo');if(!ch||document.getElementById('cleanLayout'))return;
+const original=ch.querySelector('.studio-workspace');if(!original)return;
+const top=document.createElement('nav');top.id='cleanToolbar';top.setAttribute('aria-label','Studio options');
+const layout=document.createElement('div');layout.id='cleanLayout';
+const music=document.createElement('aside');music.id='cleanMusic';music.setAttribute('aria-label','Music player, folders and playlists');
+const pdf=document.createElement('section');pdf.id='cleanPdf';pdf.setAttribute('aria-label','PDF viewer and page tagging');
+original.parentNode.insertBefore(top,original);top.after(layout);layout.append(music,pdf);
+function menu(label,open){const d=document.createElement('details');d.className='clean-menu';d.open=!!open;const summary=document.createElement('summary');summary.textContent=label;const pop=document.createElement('div');pop.className='clean-pop';d.append(summary,pop);top.appendChild(d);return pop}
+const programme=menu('Programme & release');const library=menu('PDF library');const controls=menu('PDF controls');const playlists=menu('PDF playlists');const other=menu('More options');
+const move=(element,dest)=>{if(element)dest.appendChild(element)};
+const picker=ch.querySelector('.studio-top .ch-workout-picker');move(picker,programme);
+const panel=ch.querySelector('.studio-left .studio-panel');move(panel,library);if(panel)panel.open=true;
+const actions=ch.querySelector('.studio-top .ch-top-actions');move(actions,other);
+// All original PDF viewer buttons stay together, in their own dropdown.
+const viewer=ch.querySelector('.studio-right .studio-viewer');
+if(viewer){
+ const toolbar=viewer.querySelector('.ch-viewer-toolbar,.ch-pdf-toolbar');if(toolbar)move(toolbar,controls);
+ const buttons=[...viewer.querySelectorAll('button')].filter(b=>/^(chPrev|chNext|chFitWidth|chZoomIn|chZoomOut|chFullscreen|chOpen|chViewSelected|chPlaylistPrev|chPlaylistNext)$/.test(b.id));
+ if(!toolbar&&buttons.length){const row=document.createElement('div');row.className='row';buttons.forEach(b=>row.appendChild(b));controls.appendChild(row)}
+ move(viewer,pdf);
+}
+const playlist=ch.querySelector('#chPlaylistPanel');move(playlist,playlists);
+const player=ch.querySelector('#chMusicPlayer');move(player,music);
+const albums=[...ch.querySelectorAll('.studio-left .ch-music-accordion')];albums.forEach(d=>move(d,music));
+const musicPanel=ch.querySelector('#chMusicPanel');move(musicPanel,music);
+const songLinks=ch.querySelector('.studio-middle .ch-music-accordion');move(songLinks,music);if(songLinks){const sm=songLinks.querySelector('summary');if(sm)sm.textContent='Tag songs & link notes'}
+const pdfTags=ch.querySelector('.studio-right .ch-advanced');move(pdfTags,pdf);if(pdfTags){const sm=pdfTags.querySelector('summary');if(sm)sm.textContent='Tag PDF pages'}
+const attach=document.getElementById('chReleasePdfAttach');if(attach)move(attach,library);
+const remaining=original.querySelectorAll('button,input,select,details');if(remaining.length){const rest=document.createElement('div');rest.className='clean-rest';while(original.firstChild)rest.appendChild(original.firstChild);other.appendChild(rest)}else original.remove();
+// Keep one menu open at a time. Close when clicking elsewhere.
+const menus=[...top.querySelectorAll('.clean-menu')];menus.forEach(d=>d.addEventListener('toggle',()=>{if(d.open)menus.forEach(x=>{if(x!==d)x.open=false})}));
+document.addEventListener('pointerdown',e=>{if(!top.contains(e.target))menus.forEach(d=>d.open=false)});
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script>
+</body></html>
