@@ -2664,4 +2664,46 @@ document.addEventListener('pointerdown',e=>{if(!top.contains(e.target))menus.for
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
 </script>
+
+<style id="chV31ViewerEnhancementsStyle">
+#chV31SongProgress{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 0}
+#chV31SongProgress input[type=range]{flex:1 1 130px;min-width:90px;accent-color:#2776c7;cursor:pointer}
+#chV31SongProgress span{font-variant-numeric:tabular-nums;font-size:.82rem;white-space:nowrap}
+#chV31PdfControls{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin:0 0 6px}
+#chV31PdfControls button{padding:8px 12px;min-height:36px}
+#chV31PdfControls #chFullscreen{font-weight:700}
+@media(max-width:540px){#chV31PdfControls{justify-content:stretch}#chV31PdfControls button{flex:1}}
+</style>
+<script id="chV31ViewerEnhancementsScript">
+(function(){
+function init(){
+ const $=id=>document.getElementById(id);
+ const player=$('chMusicPlayer'),audio=$('chAudio'),pdf=$('cleanPdf'),stage=$('chPdfStage');
+ if(!player||!audio||!pdf||!stage||$('chV31SongProgress'))return;
+ // Place a seekable time bar in the main player; do not replace the audio element.
+ const progress=document.createElement('div');progress.id='chV31SongProgress';
+ const elapsed=document.createElement('span');elapsed.textContent='0:00';
+ const slider=document.createElement('input');slider.type='range';slider.min='0';slider.max='1000';slider.step='1';slider.value='0';slider.setAttribute('aria-label','Song position');
+ const total=document.createElement('span');total.textContent='0:00';
+ progress.append(elapsed,slider,total);
+ const audioParent=audio.parentNode;audioParent.insertBefore(progress,audio.nextSibling);
+ const time=t=>Number.isFinite(t)&&t>=0?Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0'):'0:00';
+ let dragging=false;
+ function update(){const duration=audio.duration,current=audio.currentTime;elapsed.textContent=time(current);total.textContent=time(duration);slider.disabled=!Number.isFinite(duration)||duration<=0;if(!dragging)slider.value=slider.disabled?0:Math.round(current/duration*1000)}
+ slider.addEventListener('input',()=>{dragging=true;if(Number.isFinite(audio.duration))elapsed.textContent=time(audio.duration*Number(slider.value)/1000)});
+ slider.addEventListener('change',()=>{if(Number.isFinite(audio.duration)&&audio.duration>0)audio.currentTime=audio.duration*Number(slider.value)/1000;dragging=false;update()});
+ for(const ev of ['timeupdate','durationchange','loadedmetadata','emptied','seeked','ended'])audio.addEventListener(ev,update);
+ update();
+ // Bring the EXISTING fullscreen and rotate controls directly above the PDF viewer.
+ // This preserves their original event handlers and the existing rotation state.
+ const row=document.createElement('div');row.id='chV31PdfControls';row.setAttribute('aria-label','PDF viewer controls');
+ const fullscreen=$('chFullscreen'),rotate=$('chRotate');
+ if(fullscreen){fullscreen.textContent='⛶ View fullscreen';row.append(fullscreen)}
+ if(rotate){rotate.textContent='↻ Rotate page';row.append(rotate)}
+ const viewer=stage.closest('.studio-viewer');
+ (viewer||stage).before(row);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script>
 </body></html>
