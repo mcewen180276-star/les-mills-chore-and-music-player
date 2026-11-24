@@ -1188,7 +1188,7 @@ function chMusicPart(id){
  // Recognise "1a", "1 b", "Track 01A", "01-A", "01 Part B" (not ordinary titles).
  const m=stem.match(/^(.*?\b(?:track\s*)?\d{1,3})\s*(?:[-_. ]\s*)?(?:part\s*)?([ab])$/i);
  if(!m)return null;
- return {key:x.info.album+'|'+m[1].toLowerCase().replace(/\s+/g,' ').trim(),part:m[2].toLowerCase(),label:m[1].trim()};
+ return {key:x.info.path.split('/').slice(0,-1).join('/')+'|'+m[1].toLowerCase().replace(/\s+/g,' ').trim(),part:m[2].toLowerCase(),label:m[1].trim()};
 }
 function chMusicGroups(items){
  const groups=[],byKey=new Map();
@@ -1227,7 +1227,7 @@ function chMusicRenderLibrary(){
  const albums=[...new Set(scoped.map(([,x])=>x.info.album))].sort(),old=$('chMusicAlbum').value;
  $('chMusicAlbum').innerHTML='<option value="">All folders and albums</option>'+albums.map(x=>`<option value="${safe(x)}">${safe(x)}</option>`).join('');
  $('chMusicAlbum').value=albums.includes(old)?old:'';
- $('chMusicLibrary').innerHTML=chMusicVisibleGroups().map((g,i)=>`<div class="item ch-track-row ${g.ids.includes(chMusicState.selected)?'ch-track-active':''}"><div class="ch-track-info"><b>${safe(g.label)}</b><small>${safe(g.info.artist||g.info.album)} · ${safe(g.info.album)}${g.parted?' · A+B combined':''}</small></div><div class="ch-song-actions"><button type="button" class="primary" data-mplaygroup="${i}">▶ Play</button><button type="button" data-maddgroup="${i}">＋ Playlist</button></div></div>`).join('')||'<p class="muted">No songs loaded yet. Tap Add music files or Choose a whole music folder above. If you previously imported songs, wait for the saved library to load.</p>';
+ $('chMusicLibrary').innerHTML=chMusicVisibleGroups().map((g,i)=>`<div class="item ch-track-row ${g.ids.includes(chMusicState.selected)?'ch-track-active':''}"><div class="ch-track-info"><b>${safe(g.label)}</b><small>${safe(g.info.artist||g.info.album)} · ${safe(g.info.album)}${g.parted?' · A+B combined':''}</small></div><div class="ch-song-actions"><button type="button" class="primary" data-mplaygroup="${i}" data-song-id="${safe(g.ids[0])}">▶ Play</button><button type="button" data-maddgroup="${i}" data-song-id="${safe(g.ids[0])}">＋ Playlist</button></div></div>`).join('')||'<p class="muted">No songs loaded yet. Tap Add music files or Choose a whole music folder above. If you previously imported songs, wait for the saved library to load.</p>';
  $('chMusicCount').textContent=`${chMusicGroups([...chMusicState.files.entries()]).length} tracks · ${chMusicState.files.size} audio files · ${albums.length} folders/albums`;
 }
 function chMusicRenderPlaylists(){
@@ -1284,6 +1284,7 @@ async function chMusicDb(){
   req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
  });
 }
+let chMusicWrites=Promise.resolve(),chMusicResetting=false,chMusicGeneration=0;
 async function chMusicStore(files){
  try{
   const db=await chMusicDb();
@@ -1295,18 +1296,22 @@ async function chMusicStore(files){
  }catch(e){toast('Music is available for this session; permanent storage was unavailable or full')}
 }
 function chMusicAdd(files,store=true){
+ if(chMusicResetting)return;
  const valid=files.filter(f=>f.type.startsWith('audio/')||/\.(mp3|m4a|aac|flac|ogg|wav|opus|wma)$/i.test(f.name));
- for(const f of valid){const id=chMusicId(f);chMusicState.files.set(id,{file:f,info:chMusicInfo(f)})}
+ for(const f of valid){const id=chMusicId(f);if(chMusicState.urls.has(id)){URL.revokeObjectURL(chMusicState.urls.get(id));chMusicState.urls.delete(id)}chMusicState.files.set(id,{file:f,info:chMusicInfo(f)})}
  chMusicRenderLibrary();chMusicRenderPlaylists();
- if(store&&valid.length)chMusicStore(valid);
+ if(store&&valid.length)chMusicWrites=chMusicWrites.then(()=>chMusicStore(valid));
 }
 (async()=>{
  try{
+  const generation=chMusicGeneration;
   const db=await chMusicDb(),entries=await new Promise((resolve,reject)=>{
    const tx=db.transaction('songs','readonly'),req=tx.objectStore('songs').getAll();
    req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
   });
+  if(generation!==chMusicGeneration)return;
   for(const e of entries){
+   if(chMusicState.files.has(e.id))continue;
    const f=new File([e.blob],e.name,{type:e.blob.type||'audio/mpeg',lastModified:e.modified||0});
    const info=chMusicInfo({name:e.name,webkitRelativePath:e.path});
    chMusicState.files.set(e.id,{file:f,info});
@@ -1316,13 +1321,29 @@ function chMusicAdd(files,store=true){
 })();
 $('chMusicFiles').onchange=e=>{chMusicAdd([...e.target.files]);e.target.value=''};
 $('chMusicFolder').onchange=e=>{chMusicAdd([...e.target.files]);e.target.value=''};
+(function(){
+ const panel=document.createElement('div');panel.className='item';
+ panel.innerHTML='<details><summary>Manage music folders & links</summary><p class="muted">Clear imported audio only. Playlists and PDF links stay saved. Reimport the same folder to reconnect matching files.</p><button type="button" id="chClearMusic70">Clear music folders / cache</button> <button type="button" id="chRelinkFolder70">Add / relink folder</button> <button type="button" id="chCheckMusic70">Check music links</button><p id="chMusicStatus70" role="status"></p><label>Saved song to relink<select id="chOldSong70"></select></label><label>Correct imported audio<select id="chNewSong70"></select></label><button type="button" id="chRelinkSong70">Relink selected song</button></details>';
+ $('chMusicFolder').insertAdjacentElement('afterend',panel);
+ const status=$('chMusicStatus70');
+ function refs(){return [...new Set([...extra.musicPlaylists.flatMap(p=>p.items||[]),...Object.keys(extra.musicLinks)])]}
+ function label(id){return chMusicState.files.get(id)?.info.path||id.split('|')[0]}
+ function refresh(){const ids=refs();for(const [el,values] of [[$('chOldSong70'),ids],[$('chNewSong70'),[...chMusicState.files.keys()]]]){const old=el.value;el.replaceChildren(new Option('Choose song',''));for(const id of values)el.add(new Option(label(id)+(chMusicState.files.has(id)?'':' (missing)'),id));el.value=old}status.textContent=ids.filter(id=>!chMusicState.files.has(id)).length+' missing saved song references; '+chMusicState.files.size+' imported files.'}
+ panel.querySelector('details').addEventListener('toggle',refresh);
+ $('chCheckMusic70').onclick=refresh;
+ $('chRelinkFolder70').onclick=()=>$('chMusicFolder').click();
+ function stop(){const a=$('chAudio');a.pause();a.removeAttribute('src');a.load();chMusicState.queue=null;chMusicState.playing=-1;chMusicState.selected=null;$('chNowPlaying').textContent='No song playing';}
+ $('chClearMusic70').onclick=async()=>{if(chMusicResetting||!confirm('Clear all imported audio from this app? Your playlists and PDF links will remain. Original device files will not be deleted.'))return;chMusicResetting=true;chMusicGeneration++;try{await chMusicWrites;const db=await chMusicDb();await new Promise((resolve,reject)=>{const tx=db.transaction('songs','readwrite');tx.objectStore('songs').clear();tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)});db.close();stop();for(const url of chMusicState.urls.values())URL.revokeObjectURL(url);chMusicState.urls.clear();chMusicState.files.clear();chMusicRenderLibrary();chMusicRenderPlaylists();refresh();status.textContent='Music cache cleared. Reimport your folders.'}catch(e){status.textContent='Could not clear stored audio: '+e.message}finally{chMusicResetting=false}};
+ $('chRelinkSong70').onclick=()=>{const old=$('chOldSong70').value,id=$('chNewSong70').value;if(!old||!id||old===id||!chMusicState.files.has(id))return;if(!confirm('Replace saved references to '+label(old)+' with '+label(id)+'?'))return;stop();for(const p of extra.musicPlaylists){p.items=p.items.map(x=>x===old?id:x);if(p.names&&old in p.names){p.names[id]=chMusicState.files.get(id).info.title;delete p.names[old]}}if(extra.musicLinks[old]){extra.musicLinks[id]=[...new Map([...(extra.musicLinks[id]||[]),...extra.musicLinks[old]].map(x=>[x.key+'|'+x.page,x])).values()];delete extra.musicLinks[old]}extraSave();chMusicRenderPlaylists();refresh();status.textContent='Song references updated.'};
+})();
+
 $('chMusicSearch').oninput=chMusicRenderLibrary;
 $('chMusicAlbum').onchange=chMusicRenderLibrary;
 $('chMusicLibrary').onclick=e=>{
  const play=e.target.closest('[data-mplaygroup]');
  const add=e.target.closest('[data-maddgroup]');
  if(!play&&!add)return;
- const groups=chMusicVisibleGroups(),g=groups[Number((play||add).dataset[play?'mplaygroup':'maddgroup'])];
+ const groups=chMusicVisibleGroups(),g=groups.find(g=>g.ids[0]===(play||add).dataset.songId);
  if(!g)return;
  if(play){
   const queue=chMusicLogicalQueue(groups);
@@ -1949,7 +1970,7 @@ $('chPageSongUnlink').onclick=()=>{
   if(!button)return;
   e.stopImmediatePropagation();
   e.preventDefault();
-  const group=chMusicVisibleGroups()[Number(button.dataset.maddgroup)];
+  const group=chMusicVisibleGroups().find(g=>g.ids[0]===button.dataset.songId);
   if(!group)return;
   let p=musicPlaylist();
   if(!p){
